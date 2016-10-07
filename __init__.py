@@ -72,7 +72,7 @@ def aes_enc_cbc(key, txt, iv=[0]):
     for i in break_pieces(txt, len(key)):
         i = xor(i, iv)
         r = aes_enc_ecb(key, i)
-        iv = i
+        iv = r
         res += r
     return res
 # decrypt AES CBC
@@ -81,10 +81,10 @@ def aes_dec_cbc(key, txt, iv=[0]):
     res = []
     for i in break_pieces(txt, len(key)):
         r = aes_dec_ecb(key, i)
+        r = xor(r, iv)
         iv = i
-        i = xor(i, iv)
         res += r
-    return res[:-res[-1]]
+    return res
 
 # generate random bytes
 randr = lambda x: [random.randrange(256) for _ in xrange(x)]
@@ -125,3 +125,13 @@ def decode_ecb(oracle, tlen):
         c = decode_ecb_ltr(oracle, known)
         known.append(c)
     return known
+
+# check padding
+@b_inp([0])
+def is_padding_valid(txt):
+    if len(txt) % 16 != 0:
+        raise Exception('Invalid padding')
+    last = txt[-1]
+    if not all([x == last for x in txt[-last:]]):
+        raise Exception('Invalid padding')
+    return True
