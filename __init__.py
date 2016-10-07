@@ -105,5 +105,23 @@ def ecb_cbc_oracle(txt):
 # determine if oracle is ECB or CBC
 def is_func_ecb(f):
     txt = 'a' * 64
-    r = ecb_cbc_oracle(txt)
+    r = f(txt)
     return r[16:32] == r[32:48]
+
+# decode one letter from an ECB cipher given an oracle
+def decode_ecb_ltr(oracle, known):
+    fixed = [0] * (15 - (len(known) % 16))
+    blockslen = len(fixed) + len(known) + 1
+    target = oracle(fixed)[:blockslen]
+    fixed += known
+    for i in range(256):
+        if oracle(fixed + [i])[:blockslen] == target:
+            return i
+
+# decode entire msg given the oracle
+def decode_ecb(oracle, tlen):
+    known = []
+    while len(known) < tlen:
+        c = decode_ecb_ltr(oracle, known)
+        known.append(c)
+    return known
