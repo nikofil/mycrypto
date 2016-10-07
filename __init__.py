@@ -1,5 +1,6 @@
 import operator
 import string
+import random
 import Crypto.Cipher.AES
 
 from base64 import *
@@ -84,3 +85,25 @@ def aes_dec_cbc(key, txt, iv=[0]):
         i = xor(i, iv)
         res += r
     return res[:-res[-1]]
+
+# generate random bytes
+randr = lambda x: [random.randrange(256) for _ in xrange(x)]
+# ecb or cbc oracle
+@b_inp([0])
+def ecb_cbc_oracle(txt):
+    key = randr(16)
+    txt = randr(random.randint(5, 10)) + txt + randr(random.randint(5, 10))
+    txt = pad_to(txt, 16)
+    if random.choice([True, False]):
+        print "Using ECB"
+        return aes_enc_ecb(key, txt)
+    else:
+        print "Using CBC"
+        iv = randr(16)
+        return aes_enc_cbc(key, txt, iv)
+
+# determine if oracle is ECB or CBC
+def is_func_ecb(f):
+    txt = 'a' * 64
+    r = ecb_cbc_oracle(txt)
+    return r[16:32] == r[32:48]
