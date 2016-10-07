@@ -8,6 +8,8 @@ freq = {'e': 12.70, 't': 9.06, 'a': 8.17, 'o': 7.51, 'i': 6.97, 'n': 6.75, 's': 
 
 # str to int array
 s2a = lambda x: [ord(x) for x in x]
+# int array to str
+a2s = lambda a: ''.join([chr(x) for x in a])
 # break string into pieces of same length
 break_pieces = lambda s, l: [s[i:i+l] for i in range(len(s))[::l]]
 # hex str to int array
@@ -25,8 +27,24 @@ score = lambda x: reduce(operator.add, map(lambda y: freq[y] if y in freq else 0
 # hamming distance of two arrays
 hamm = lambda x, y: sum([bin(x ^ y).count('1') for (x, y) in zip(x, y)])
 # most likely key length in range
-most_likely_len = lambda c, r: min([(l, float(hamm(break_pieces(c, l)[0], break_pieces(c, l)[1]))/l) for l in r], key=operator.itemgetter(1))[0]
-
-def crackxor(txt, alphabet=None):
-    if alphabet is None:
-        alphabet = string.ascii_letters
+most_likely_lens = lambda c, r: sorted([(l, float(hamm(break_pieces(c, l)[0], break_pieces(c, l)[1]))/l) for l in r], key=operator.itemgetter(1))
+# crack repeating xor cipher
+def crackxor(txt, to_len=30, print_txt=True):
+    key_lens = most_likely_len(txt, range(2, to_len))
+    ret = []
+    for key_len in key_lens:
+        key_len = key_len[0]
+        groups = izip_longest(*break_pieces(txt, key_len), fillvalue=None)
+        def rate_key(txt, key):
+            dec = [x ^ key for x in txt if x is not None]
+            for d in dec:
+                if d not in s2a(string.printable):
+                    return 0
+            return score(a2s(dec))
+        res = [max([(k, rate_key(g, k)) for k in range(256)], key=operator.itemgetter(1)) for g in groups]
+        if all([r[1] > 0 for r in res]):
+            key = [r[0] for r in res]
+            ret.append(key)
+            if print_txt:
+                print a2s(xor(txt, key))
+    return ret
