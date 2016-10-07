@@ -1,5 +1,6 @@
 import operator
 import string
+import Crypto.Cipher.AES
 
 from base64 import *
 from itertools import *
@@ -10,6 +11,15 @@ freq = {'e': 12.70, 't': 9.06, 'a': 8.17, 'o': 7.51, 'i': 6.97, 'n': 6.75, 's': 
 s2a = lambda x: [ord(x) for x in x]
 # int array to str
 a2s = lambda a: ''.join([chr(x) for x in a])
+
+def b_inp(r):
+    def wrapper(f):
+        def wrapped(*args):
+            args2 = [s2a(x) if (i in r and type(x) == str) else x for (i, x) in enumerate(args)]
+            return f(*args2)
+        return wrapped
+    return wrapper
+
 # break string into pieces of same length
 break_pieces = lambda s, l: [s[i:i+l] for i in range(len(s))[::l]]
 # hex str to int array
@@ -46,5 +56,31 @@ def crackxor(txt, to_len=30, print_txt=True):
             key = [r[0] for r in res]
             ret.append(key)
             if print_txt:
-                print a2s(xor(txt, key))
+                print(a2s(xor(txt, key)))
     return ret
+# encrypt AES ECB
+aes_enc_ecb = b_inp([0, 1])(lambda key, txt: s2a(Crypto.Cipher.AES.new(a2s(key), Crypto.Cipher.AES.MODE_ECB).encrypt(a2s(txt))))
+# decrypt AES ECB
+aes_dec_ecb = b_inp([0, 1])(lambda key, txt: s2a(Crypto.Cipher.AES.new(a2s(key), Crypto.Cipher.AES.MODE_ECB).decrypt(a2s(txt))))
+# PKCS7 padding
+pad_to = b_inp([0])(lambda x, l: x + [l - (len(x) % l)] * (l - (len(x) % l)))
+# encrypt AES CBC
+@b_inp([0, 1, 2])
+def aes_enc_cbc(key, txt, iv=[0]):
+    res = []
+    for i in break_pieces(txt, len(key)):
+        i = xor(i, iv)
+        r = aes_enc_ecb(key, i)
+        iv = i
+        res += r
+    return res
+# decrypt AES CBC
+@b_inp([0, 1, 2])
+def aes_dec_cbc(key, txt, iv=[0]):
+    res = []
+    for i in break_pieces(txt, len(key)):
+        r = aes_dec_ecb(key, i)
+        iv = i
+        i = xor(i, iv)
+        res += r
+    return res[:-res[-1]]
