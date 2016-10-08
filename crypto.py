@@ -13,6 +13,7 @@ s2a = lambda x: [ord(x) for x in x]
 # int array to str
 a2s = lambda a: ''.join([chr(x) for x in a])
 
+# decorator to translate strings to int arrays
 def b_inp(r):
     def wrapper(f):
         def wrapped(*args):
@@ -65,6 +66,7 @@ aes_enc_ecb = b_inp([0, 1])(lambda key, txt: s2a(Crypto.Cipher.AES.new(a2s(key),
 aes_dec_ecb = b_inp([0, 1])(lambda key, txt: s2a(Crypto.Cipher.AES.new(a2s(key), Crypto.Cipher.AES.MODE_ECB).decrypt(a2s(txt))))
 # PKCS7 padding
 pad_to = b_inp([0])(lambda x, l: x + [l - (len(x) % l)] * (l - (len(x) % l)))
+
 # encrypt AES CBC
 @b_inp([0, 1, 2])
 def aes_enc_cbc(key, txt, iv=[0]):
@@ -75,6 +77,7 @@ def aes_enc_cbc(key, txt, iv=[0]):
         iv = r
         res += r
     return res
+
 # decrypt AES CBC
 @b_inp([0, 1, 2])
 def aes_dec_cbc(key, txt, iv=[0]):
@@ -88,6 +91,11 @@ def aes_dec_cbc(key, txt, iv=[0]):
 
 # generate random bytes
 randr = lambda x: [random.randrange(256) for _ in xrange(x)]
+
+# generated key and iv
+__key__ = randr(16)
+__iv__ = randr(16)
+
 # ecb or cbc oracle
 @b_inp([0])
 def ecb_cbc_oracle(txt):
@@ -135,3 +143,7 @@ def is_padding_valid(txt):
     if not all([x == last for x in txt[-last:]]):
         raise Exception('Invalid padding')
     return True
+
+# is padding of a cryptomsg valid
+def pad_oracle(c, key=__key__, iv=__iv__):
+    return is_padding_valid(aes_dec_cbc(key, c, iv))
