@@ -92,10 +92,6 @@ def aes_dec_cbc(key, txt, iv=[0]):
 # generate random bytes
 randr = lambda x: [random.randrange(256) for _ in xrange(x)]
 
-# generated key and iv
-__key__ = randr(16)
-__iv__ = randr(16)
-
 # ecb or cbc oracle
 @b_inp([0])
 def ecb_cbc_oracle(txt):
@@ -138,12 +134,48 @@ def decode_ecb(oracle, tlen):
 @b_inp([0])
 def is_padding_valid(txt):
     if len(txt) % 16 != 0:
-        raise Exception('Invalid padding')
+        return False
     last = txt[-1]
     if not all([x == last for x in txt[-last:]]):
-        raise Exception('Invalid padding')
+        return False
     return True
 
 # is padding of a cryptomsg valid
-def pad_oracle(c, key=__key__, iv=__iv__):
-    return is_padding_valid(aes_dec_cbc(key, c, iv))
+def create_pad_oracle(key, iv):
+    def pad_oracle(c):
+        return is_padding_valid(aes_dec_cbc(key, c, iv))
+    return pad_oracle
+
+# decrypt a cbc block using a padding oracle
+def decode_cbc_block(prev, blk, pad_oracle):
+    known = []
+    founddecs = [pad_oracle(prev[:-1] + [i] + blk) for i in range(256)]
+    already_valid = pad_oracle(prev + blk)
+    if founddecs.count(True) - int(already_valid) > 1:
+        raise Exception(str(founddecs.count(True)) + ' possible last bytes')
+    if not any(founddecs):
+        raise Exception('no valid blocks')
+    if already_valid:
+        # figure out how many bytes of padding we already have
+        # and we instantly figure out that many bytes in the block
+        def withv(l, i, val):
+            r = l[:]
+            r[i] = val
+            return r
+
+        for i in range(len(blk), 0, -1):
+            if not all([pad_oracle(withv(prev, -i, l) + blk) for l in range(256)]):
+                print i, 'byte(s) pad found'
+                known = xor([i] * i, prev[-i:])
+                break
+    while len(known) < len(blk):
+        kl = len(known)
+        # try to set a valid padding of length kl+1
+        # while knowing the rest of the kl bits
+        prev2 = prev[:-kl-1] + [0] + [x ^ (kl+1) for x in known]
+        for i in range(256):
+            prev2[-kl-1] = i
+            if pad_oracle(prev2 + blk):
+                known = [i ^ (kl+1)] + known
+                break
+    return xor(known, prev[-len(known):])
