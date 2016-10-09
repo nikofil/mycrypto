@@ -1,5 +1,6 @@
 import operator
 import string
+import struct
 import random
 import Crypto.Cipher.AES
 
@@ -33,7 +34,7 @@ b64 = lambda x: b64encode(''.join(map(chr, x)))
 # base64 decode to array
 u64 = lambda x: map(ord, b64decode(x))
 # xor msg array with key array
-xor = lambda x, y: list(imap(operator.xor, x, cycle(y)))
+xor = b_inp([0, 1])(lambda x, y: list(imap(operator.xor, x, cycle(y))))
 # score of an array based on freq
 score = lambda x: reduce(operator.add, map(lambda y: freq[y] if y in freq else 0, x.lower()))
 # hamming distance of two arrays
@@ -186,4 +187,14 @@ def decode_cbc(txt, pad_oracle, iv):
     for i in range(1, len(txt)/16):
         ind = i * 16;
         r += decode_cbc_block(txt[:ind], txt[ind:ind+16], pad_oracle)
+    return r
+
+
+# encrypt in ctr mode
+def aes_ctr(key, txt, nonce=0):
+    r = []
+    for i, p in enumerate(break_pieces(txt, 16)):
+        blk = struct.pack('<q', nonce) + struct.pack('<q', i)
+        c = aes_enc_ecb(key, blk)
+        r += xor(p, c)
     return r
