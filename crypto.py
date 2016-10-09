@@ -179,3 +179,11 @@ def decode_cbc_block(prev, blk, pad_oracle):
                 known = [i ^ (kl+1)] + known
                 break
     return xor(known, prev[-len(known):])
+
+# decrypt entire cbc message
+def decode_cbc(txt, pad_oracle, iv):
+    r = decode_cbc_block(iv, txt[:16], pad_oracle)
+    for i in range(1, len(txt)/16):
+        ind = i * 16;
+        r += decode_cbc_block(txt[:ind], txt[ind:ind+16], pad_oracle)
+    return r
