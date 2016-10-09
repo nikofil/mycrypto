@@ -40,7 +40,7 @@ score = lambda x: reduce(operator.add, map(lambda y: freq[y] if y in freq else 0
 # hamming distance of two arrays
 hamm = lambda x, y: sum([bin(x ^ y).count('1') for (x, y) in zip(x, y)])
 # most likely key length in range
-most_likely_lens = lambda c, r: sorted([(l, float(hamm(break_pieces(c, l)[0], break_pieces(c, l)[1]))/l) for l in r], key=operator.itemgetter(1))
+most_likely_len = lambda c, r: sorted([(l, float(hamm(break_pieces(c, l)[0], break_pieces(c, l)[1]))/l) for l in r], key=operator.itemgetter(1))
 # crack repeating xor cipher
 def crackxor(txt, to_len=30, print_txt=True):
     key_lens = most_likely_len(txt, range(2, to_len))
@@ -198,3 +198,39 @@ def aes_ctr(key, txt, nonce=0):
         c = aes_enc_ecb(key, blk)
         r += xor(p, c)
     return r
+
+# mersenne twister mt19937 prng
+_mstate = [0] * 624
+_midx = 625
+
+# seeding function
+def mt_seed(s):
+    global _mstate
+    global _midx
+    _midx = 624
+    _mstate[0] = s
+    for i in range(1, 624):
+        _mstate[i] = 0xFFFFFFFF & (1812433253 * (_mstate[i-1] ^ (_mstate[i-1] >> 30)) + i)
+
+# prng function
+def mt_rand():
+    global _mstate
+    global _midx
+    if _midx > 624:
+        raise Exception("must use mt_seed")
+    if _midx == 624:
+        uppermask = 0xFFFFFFFF << 31
+        for i in range(624):
+            x = (_mstate[i] & uppermask) + (_mstate[(i+1) % 624] & 0x7FFFFFFF)
+            xa = x >> 1
+            if x & 1 == 1:
+                xa = xa ^ 0x9908B0DF
+            _mstate[i] = _mstate[(i+397) % 624] ^ xa
+        _midx = 0
+    y = _mstate[_midx]
+    y ^= (y >> 11) & 0xFFFFFFFF
+    y ^= (y << 7) & 0x9D2C5680
+    y ^= (y << 15) & 0xEFC60000
+    y ^= y >> 18
+    _midx += 1
+    return y & 0xFFFFFFFF
