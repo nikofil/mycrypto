@@ -219,6 +219,7 @@ def mt_rand():
     if _midx > 624:
         raise Exception("must use mt_seed")
     if _midx == 624:
+        # twist state
         uppermask = 0xFFFFFFFF << 31
         for i in range(624):
             x = (_mstate[i] & uppermask) + (_mstate[(i+1) % 624] & 0x7FFFFFFF)
@@ -251,3 +252,11 @@ def untemper(x):
     # reverse first step
     x ^= (x >> 11) ^ (x >> 22)
     return x
+
+# given 624 outputs of mt_rand without a twist in between,
+# splice the state so that the next results match
+def clone_rng(rands):
+    global _mstate
+    global _midx
+    _midx = 624
+    _mstate = [untemper(x) for x in rands]
