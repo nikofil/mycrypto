@@ -228,9 +228,26 @@ def mt_rand():
             _mstate[i] = _mstate[(i+397) % 624] ^ xa
         _midx = 0
     y = _mstate[_midx]
+    # diffuse bits
     y ^= (y >> 11) & 0xFFFFFFFF
     y ^= (y << 7) & 0x9D2C5680
     y ^= (y << 15) & 0xEFC60000
     y ^= y >> 18
     _midx += 1
     return y & 0xFFFFFFFF
+
+# reverse the bit diffusion part of mt_rand
+def untemper(x):
+    # reverse last step
+    x ^= x >> 18
+    # reverse third step
+    x ^= (x << 15) & 0xEFC60000
+    # reverse second step
+    x ^= (x << 7) & 0x9D2C5680 & 0x3F80
+    x ^= (x << 7) & 0x9D2C5680 & 0x1FC000
+    x ^= (x << 7) & 0x9D2C5680 & 0xFE00000
+    x ^= (x << 7) & 0x9D2C5680 & 0xF0000000
+    x &= 0xFFFFFFFF
+    # reverse first step
+    x ^= (x >> 11) ^ (x >> 22)
+    return x
