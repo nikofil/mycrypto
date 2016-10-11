@@ -1,5 +1,6 @@
 import operator
 import string
+import time
 import struct
 import random
 import Crypto.Cipher.AES
@@ -260,3 +261,29 @@ def clone_rng(rands):
     global _midx
     _midx = 624
     _mstate = [untemper(x) for x in rands]
+
+#insecure encrypt based on mt19937
+@b_inp([0, 1])
+def mt_enc(key, txt):
+    mt_seed(key & 0xFFFF)
+    rlen = mt_rand() & 0xFF
+    r = [mt_rand() & 0xFF for _ in xrange(rlen)]
+    r += [(mt_rand() & 0xFF) ^ x for x in txt]
+    return r
+
+@b_inp([0, 1])
+def mt_dec(key, ctxt):
+    mt_seed(key & 0xFFFF)
+    rlen = mt_rand() & 0xFF
+    for i in xrange(rlen):
+        mt_rand()
+    r = [(mt_rand() & 0xFF) ^ x for x in ctxt[rlen:]]
+    return r
+
+# insecure generate token
+def gen_token():
+    mt_seed(int(time.mktime(time.localtime())))
+    i = mt_rand() & 0xFF
+    for _ in xrange(i):
+        mt_rand()
+    return mt_rand()
