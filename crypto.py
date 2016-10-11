@@ -192,6 +192,7 @@ def decode_cbc(txt, pad_oracle, iv):
 
 
 # encrypt in ctr mode
+@b_inp([0, 1, 2])
 def aes_ctr(key, txt, nonce=0):
     r = []
     for i, p in enumerate(break_pieces(txt, 16)):
@@ -199,6 +200,17 @@ def aes_ctr(key, txt, nonce=0):
         c = aes_enc_ecb(key, blk)
         r += xor(p, c)
     return r
+
+# (lazy) edit ctr ciphertext
+@b_inp([0, 1, 3, 4, 5])
+def aes_ctr_edit(ctxt, offset, newtxt, key, nonce=0):
+    ctxt_new = aes_ctr(key, [0] * offset + newtxt, nonce)[offset:offset+len(newtxt)]
+    return ctxt[:offset] + ctxt_new + ctxt[offset+len(newtxt):]
+
+# decode ctr ciphertext given aes_ctr_edit
+def decode_ctr(ctxt, key, nonce=0):
+    xorkey = aes_ctr_edit(ctxt, 0, [0]*len(ctxt), key, nonce)
+    return xor(ctxt, xorkey)
 
 # mersenne twister mt19937 prng
 _mstate = [0] * 624
