@@ -94,6 +94,20 @@ def aes_dec_cbc(key, txt, iv=[0]):
 # generate random bytes
 randr = lambda x: [random.randrange(256) for _ in xrange(x)]
 
+# throw error with plaintext if unprintable character is found in plaintext
+def aes_cbc_throw_err_ascii(x, key):
+    txt = aes_dec_cbc(key, x, key)
+    txt = txt[:-txt[-1]]
+    if not all([chr(cr) in string.printable for cr in txt]):
+        return txt
+    return None
+
+# retrieve key from above method given a ciphertext when iv = key
+def aes_cbc_atk_err_ascii_ivkey(ctxt, key):
+    myctxt = ctxt[:16] + [0]*16 + ctxt
+    txt = aes_cbc_throw_err_ascii(myctxt, key)
+    return xor(txt[:16], txt[32:48])
+
 # ecb or cbc oracle
 @b_inp([0])
 def ecb_cbc_oracle(txt):
