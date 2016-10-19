@@ -4,6 +4,7 @@ import time
 import struct
 import random
 import Crypto.Cipher.AES
+import sha1 as s1
 
 from base64 import *
 from itertools import *
@@ -313,3 +314,12 @@ def gen_token():
     for _ in xrange(i):
         mt_rand()
     return mt_rand()
+
+# SHA1
+sha1 = b_inp([0])(lambda x: h2a(s1.sha1(a2s(x))))
+
+# SHA1 HMAC
+sha1_mac = b_inp([0, 1])(lambda key, msg: sha1(key + msg))
+
+# SHA1 create padding for message of length
+sha1_pad_len = lambda l: [1 << 7] + [0]*((64 - ((l + 9) % 64)) % 64) + [3]*8
