@@ -322,4 +322,15 @@ sha1 = b_inp([0])(lambda x: h2a(s1.sha1(a2s(x))))
 sha1_mac = b_inp([0, 1])(lambda key, msg: sha1(key + msg))
 
 # SHA1 create padding for message of length
-sha1_pad_len = lambda l: [1 << 7] + [0]*((64 - ((l + 9) % 64)) % 64) + [3]*8
+sha1_pad_len = lambda l: [1 << 7] + [0]*((64 - ((l + 9) % 64)) % 64) + s2a(struct.pack('>Q', l * 8))
+
+# SHA1 with tampered state
+@b_inp([0])
+def sha1_tamper(x, prevlen, *args):
+    obj = s1.Sha1Hash()
+    obj._message_byte_length = prevlen
+    obj._h = args
+    return h2a(obj.update(a2s(x)).hexdigest())
+
+# verify SHA1 signed string
+sha1_verify = lambda key, ctxt, ptxt: ctxt == sha1_mac(key, ptxt)
