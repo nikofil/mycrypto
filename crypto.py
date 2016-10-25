@@ -4,7 +4,8 @@ import time
 import struct
 import random
 import Crypto.Cipher.AES
-import sha1 as s1
+import sha1 as _sha1
+import md4 as _md4
 
 from base64 import *
 from itertools import *
@@ -316,7 +317,7 @@ def gen_token():
     return mt_rand()
 
 # SHA1
-sha1 = b_inp([0])(lambda x: h2a(s1.sha1(a2s(x))))
+sha1 = b_inp([0])(lambda x: h2a(_sha1.sha1(a2s(x))))
 
 # SHA1 HMAC
 sha1_mac = b_inp([0, 1])(lambda key, msg: sha1(key + msg))
@@ -327,10 +328,17 @@ sha1_pad_len = lambda l: [1 << 7] + [0]*((64 - ((l + 9) % 64)) % 64) + s2a(struc
 # SHA1 with tampered state
 @b_inp([0])
 def sha1_tamper(x, prevlen, *args):
-    obj = s1.Sha1Hash()
+    obj = _sha1.Sha1Hash()
     obj._message_byte_length = prevlen
     obj._h = args
     return h2a(obj.update(a2s(x)).hexdigest())
 
 # verify SHA1 signed string
 sha1_verify = lambda key, ctxt, ptxt: ctxt == sha1_mac(key, ptxt)
+
+# MD4
+@b_inp([0])
+def md4(x):
+    m = _md4.MD4()
+    m.update(a2s(x))
+    return h2a(m.digest())
