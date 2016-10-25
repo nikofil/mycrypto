@@ -342,3 +342,20 @@ def md4(x):
     m = _md4.MD4()
     m.update(a2s(x))
     return h2a(m.digest())
+
+# MD4 HMAC
+md4_mac = b_inp([0, 1])(lambda key, msg: md4(key + msg))
+
+# SHA1 create padding for message of length
+md4_pad_len = lambda l: [1 << 7] + [0]*((64 - ((l + 9) % 64)) % 64) + s2a(struct.pack('<Q', l * 8))
+
+# verify MD4 signed string
+md4_verify = lambda key, ctxt, ptxt: ctxt == md4_mac(key, ptxt)
+
+# MD4 with tampered state
+@b_inp([0])
+def md4_tamper(x, prevlen, *args):
+    obj = _md4.MD4()
+    obj.A, obj.B, obj.C, obj.D = args;
+    obj._compress(x + md4_pad_len(prevlen + len(x)))
+    return h2a(obj.digest())
