@@ -18,6 +18,33 @@ s2a = lambda x: [ord(x) for x in x]
 # int array to str
 a2s = lambda a: ''.join([chr(x) for x in a])
 
+# start HMAC server
+if __name__ == '__main__':
+    from flask import Flask, request
+    app = Flask(__name__)
+    hmac_key = randr(64)
+
+    @app.route('/hmac')
+    def hmac():
+        with open(request.args.get('file')) as f:
+            x = f.read()
+        signature = h2a(request.args.get('signature'))
+        s1 = hmac_sha1(hmac_key, x)
+        for i, j in zip(signature+[0]*30, s1):
+            if i != j:
+                return ('no', 500)
+            time.sleep(0.005)
+        return ('ok', 200)
+
+    @app.route('/')
+    def ind():
+        with open(request.args.get('file')) as f:
+            x = f.read()
+        s1 = hmac_sha1(hmac_key, x)
+        return a2h(s1)
+
+    app.run(port=8081, processes=10)
+
 # decorator to translate strings to int arrays
 def b_inp(r):
     def wrapper(f):
@@ -392,29 +419,24 @@ def break_hmac_sha1(f):
         b = cur.index(max(cur))
         url += '{:02x}'.format(b)
 
-
-if __name__ == '__main__':
-    from flask import Flask, request
-    app = Flask(__name__)
-    hmac_key = randr(64)
-
-    @app.route('/hmac')
-    def hmac():
-        with open(request.args.get('file')) as f:
-            x = f.read()
-        signature = h2a(request.args.get('signature'))
-        s1 = hmac_sha1(hmac_key, x)
-        for i, j in zip(signature+[0]*30, s1):
-            if i != j:
-                return ('no', 500)
-            time.sleep(0.005)
-        return ('ok', 200)
-
-    @app.route('/')
-    def ind():
-        with open(request.args.get('file')) as f:
-            x = f.read()
-        s1 = hmac_sha1(hmac_key, x)
-        return a2h(s1)
-
-    app.run(port=8081, processes=10)
+# Diffie-Hellman key exchange
+def dh(B=None):
+    sess = None
+    p = int('ffffffffffffffffc90fdaa22168c234c4c6628b80dc'
+            '1cd129024e088a67cc74020bbea63b139b22514a0879'
+            '8e3404ddef9519b3cd3a431b302b0a6df25f14374fe1'
+            '356d6d51c245e485b576625e7ec6f44c42e9a637ed6b'
+            '0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b'
+            '1fe649286651ece45b3dc2007cb8a163bf0598da4836'
+            '1c55d39a69163fa8fd24cf5f83655d23dca3ad961c62'
+            'f356208552bb9ed529077096966d670c354e4abc9804'
+            'f1746c08ca237327ffffffffffffffff', 16)
+    g = 2
+    a = random.randint(0, p)
+    A = pow(g, a, p)
+    if B is None:
+        B, sess = dh(A)
+    mysess = pow(B, a, p)
+    if sess is not None:
+        assert sess == mysess
+    return (A, mysess)
