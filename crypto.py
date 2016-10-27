@@ -3,6 +3,7 @@ import string
 import time
 import struct
 import random
+import requests
 import Crypto.Cipher.AES
 import sha1 as _sha1
 import md4 as _md4
@@ -359,3 +360,61 @@ def md4_tamper(x, prevlen, *args):
     obj.A, obj.B, obj.C, obj.D = args;
     obj._compress(x + md4_pad_len(prevlen + len(x)))
     return h2a(obj.digest())
+
+# HMAC SHA1
+@b_inp([0, 1])
+def hmac_sha1(key, msg):
+    if (len(key) > 64):
+        key = sha1(key)
+    if (len(key) < 64):
+        key = key + [0]*(64 - len(key))
+    opad = xor([0x5c]*64, key)
+    ipad = xor([0x36]*64, key)
+    return sha1(opad + sha1(ipad + msg))
+
+# break HMAC SHA1 with timing side channel attack
+def break_hmac_sha1(f):
+    getst = lambda x: requests.get(x).status_code
+    url = 'http://localhost:8081/hmac?file='+f+'&signature='
+    while True:
+        cur = [0] * 256
+        print url
+        if url[-1] != '=':
+            if getst(url) == 200:
+                return url
+        for j in range(256):
+            url2 = url + '{:02x}'.format(j)
+            t1 = time.time()
+            for i in range(50):
+                getst(url2)
+            elapsed = time.time() - t1
+            cur[j] += elapsed
+        b = cur.index(max(cur))
+        url += '{:02x}'.format(b)
+
+
+if __name__ == '__main__':
+    from flask import Flask, request
+    app = Flask(__name__)
+    hmac_key = randr(64)
+
+    @app.route('/hmac')
+    def hmac():
+        with open(request.args.get('file')) as f:
+            x = f.read()
+        signature = h2a(request.args.get('signature'))
+        s1 = hmac_sha1(hmac_key, x)
+        for i, j in zip(signature+[0]*30, s1):
+            if i != j:
+                return ('no', 500)
+            time.sleep(0.005)
+        return ('ok', 200)
+
+    @app.route('/')
+    def ind():
+        with open(request.args.get('file')) as f:
+            x = f.read()
+        s1 = hmac_sha1(hmac_key, x)
+        return a2h(s1)
+
+    app.run(port=8081, processes=10)
