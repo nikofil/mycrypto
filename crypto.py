@@ -64,6 +64,8 @@ a2h = lambda x: ''.join([hex(a)[2:].zfill(2) for a in x])
 b64 = lambda x: b64encode(''.join(map(chr, x)))
 # base64 decode to array
 u64 = lambda x: map(ord, b64decode(x))
+# int to int array
+i2a = lambda x: [int(a, 16) for a in break_pieces(('%x' % x).zfill(2), 2)]
 # xor msg array with key array
 xor = b_inp([0, 1])(lambda x, y: list(imap(operator.xor, x, cycle(y))))
 # score of an array based on freq
@@ -420,9 +422,10 @@ def break_hmac_sha1(f):
         url += '{:02x}'.format(b)
 
 # Diffie-Hellman key exchange
-def dh(B=None):
+def dh(B=None, p=None, g=None):
     sess = None
-    p = int('ffffffffffffffffc90fdaa22168c234c4c6628b80dc'
+    p = p or \
+        int('ffffffffffffffffc90fdaa22168c234c4c6628b80dc'
             '1cd129024e088a67cc74020bbea63b139b22514a0879'
             '8e3404ddef9519b3cd3a431b302b0a6df25f14374fe1'
             '356d6d51c245e485b576625e7ec6f44c42e9a637ed6b'
@@ -431,7 +434,7 @@ def dh(B=None):
             '1c55d39a69163fa8fd24cf5f83655d23dca3ad961c62'
             'f356208552bb9ed529077096966d670c354e4abc9804'
             'f1746c08ca237327ffffffffffffffff', 16)
-    g = 2
+    g = g or 2
     a = random.randint(0, p)
     A = pow(g, a, p)
     if B is None:
@@ -440,3 +443,74 @@ def dh(B=None):
     if sess is not None:
         assert sess == mysess
     return (A, mysess)
+
+#DH exchange bot
+class DHBot(object):
+
+    def set_other(self, other):
+        self.other = other
+
+    def begin(self):
+        self.p = \
+        int('ffffffffffffffffc90fdaa22168c234c4c6628b80dc'
+            '1cd129024e088a67cc74020bbea63b139b22514a0879'
+            '8e3404ddef9519b3cd3a431b302b0a6df25f14374fe1'
+            '356d6d51c245e485b576625e7ec6f44c42e9a637ed6b'
+            '0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b'
+            '1fe649286651ece45b3dc2007cb8a163bf0598da4836'
+            '1c55d39a69163fa8fd24cf5f83655d23dca3ad961c62'
+            'f356208552bb9ed529077096966d670c354e4abc9804'
+            'f1746c08ca237327ffffffffffffffff', 16)
+        self.g = 2
+        self.a = random.randint(0, self.p)
+        self.A = pow(self.g, self.a, self.p)
+        self.other.step1(self.p, self.g, self.A)
+
+    def step1(self, p, g, A):
+        self.p = p
+        self.g = g
+        self.A = A
+        self.b = random.randint(0, p)
+        self.B = pow(g, self.b, p)
+        self.sess = pow(A, self.b, p)
+        self.aes_key = sha1(i2a(self.sess))[:16]
+        self.other.step2(self.B)
+
+    def step2(self, B):
+        self.sess = pow(B, self.a, self.p)
+        self.aes_key = sha1(i2a(self.sess))[:16]
+        self.msg = 'hello world ' + str(random.randint(1, 1000000))
+        iv = randr(16)
+        encr = aes_enc_cbc(self.aes_key, pad_to(self.msg, 16), iv) + iv
+        print('A sent msg: "' + self.msg + '" with len ' + str(len(self.msg)))
+        self.other.step3(encr)
+
+    def step3(self, encr):
+        iv = encr[-16:]
+        msg = aes_dec_cbc(self.aes_key, encr[:-16], iv)
+        padlen = msg[-1]
+        msg = msg[:-padlen]
+        print('B received msg: "' + a2s(msg) + '" with len ' + str(len(msg)))
+        iv2 = randr(16)
+        encr2 = aes_enc_cbc(self.aes_key, pad_to(msg, 16), iv2) + iv2
+        self.other.step4(encr2)
+
+    def step4(self, encr):
+        iv = encr[-16:]
+        msg = aes_dec_cbc(self.aes_key, encr[:-16], iv)
+        padlen = msg[-1]
+        msg = msg[:-padlen]
+        print('A received msg: "' + a2s(msg) + '" with len ' + str(len(msg)))
+
+# start a DH key exchange with an optional adversary
+def do_dhke(adv=None):
+    a = DHBot()
+    b = DHBot()
+    if adv:
+        a.set_other(adv)
+        b.set_other(adv)
+        adv.set_others(a, b)
+    else:
+        a.set_other(b)
+        b.set_other(a)
+    a.begin()
