@@ -482,7 +482,7 @@ class DHBot(object):
         self.msg = 'hello world ' + str(random.randint(1, 1000000))
         iv = randr(16)
         encr = aes_enc_cbc(self.aes_key, pad_to(self.msg, 16), iv) + iv
-        print('A sent msg: "' + self.msg + '" with len ' + str(len(self.msg)))
+        print('A sent msg: "%s" with len %d' % (self.msg, len(self.msg)))
         self.other.step3(encr)
 
     def step3(self, encr):
@@ -490,7 +490,7 @@ class DHBot(object):
         msg = aes_dec_cbc(self.aes_key, encr[:-16], iv)
         padlen = msg[-1]
         msg = msg[:-padlen]
-        print('B received msg: "' + a2s(msg) + '" with len ' + str(len(msg)))
+        print('B received msg: "%s" with len %d' % (a2s(msg), len(msg)))
         iv2 = randr(16)
         encr2 = aes_enc_cbc(self.aes_key, pad_to(msg, 16), iv2) + iv2
         self.other.step4(encr2)
@@ -500,7 +500,34 @@ class DHBot(object):
         msg = aes_dec_cbc(self.aes_key, encr[:-16], iv)
         padlen = msg[-1]
         msg = msg[:-padlen]
-        print('A received msg: "' + a2s(msg) + '" with len ' + str(len(msg)))
+        print('A received msg: "%s" with len %d' % (a2s(msg), len(msg)))
+
+# DH adversary
+class DHAdv(object):
+    def set_others(self, ao, bo):
+        self.ao = ao
+        self.bo = bo
+
+    def step1(self, p, g, A):
+        self.p = p
+        self.A = A
+        self.bo.step1(p, g, p)
+
+    def step2(self, B):
+        self.B = B
+        self.ao.step2(self.p)
+
+    def step3(self, encr):
+        sess = sha1([0])[:16]
+        iv = encr[-16:]
+        encrm = encr[:-16]
+        msg = aes_dec_cbc(sess, encrm, iv)
+        msg = msg[:-msg[-1]]
+        print('Decrypted msg: "%s" with len %d' % (a2s(msg), len(msg)))
+        self.bo.step3(encr)
+
+    def step4(self, encr):
+        self.ao.step4(encr)
 
 # start a DH key exchange with an optional adversary
 def do_dhke(adv=None):
