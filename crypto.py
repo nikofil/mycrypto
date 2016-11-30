@@ -666,10 +666,11 @@ class SRPBot(object):
         print(['Login failed', 'Login successful'][mac == hmac_sha256(K, self.salt)])
 
 # Perform SRP exchange
-def do_srp(adv=None):
-    a = SRPBot('email@email.com', 'password')
-    adv = adv or SRPBot
-    b = adv('email@email.com', 'password')
+def do_srp(client=None, server=None):
+    server = server or SRPBot
+    a = server('email@email.com', 'password')
+    client = client or SRPBot
+    b = client('email@email.com', 'password')
     a.set_other(b)
     b.set_other(a)
     a.begin()
@@ -697,3 +698,31 @@ class SRPAdv2(SRPBot):
     def step3(self, salt, B):
         K = hashlib.sha256(str('0')).hexdigest()
         self.other.step4(hmac_sha256(K, salt))
+
+# Simplified SRP
+class SimpleSRP(SRPBot):
+    def step2(self, email, A):
+        self.b = random.randint(0, self.N)
+        self.A = A
+        self.B = pow(self.g, self.b, self.N)
+        self.u = int(a2h(randr(16)), 16)
+        self.other.step3(self.salt, self.B, self.u)
+
+    def step3(self, salt, B, u):
+        self.B = B
+        self.u = u
+        xH = hashlib.sha256(salt + self.pw).hexdigest()
+        x = int(xH, 16)
+        S = pow(B, self.a + self.u*x, self.N)
+        K = hashlib.sha256(str(S)).hexdigest()
+        self.other.step4(hmac_sha256(K, salt))
+
+    def step4(self, mac):
+        S = pow(self.A * pow(self.v, self.u, self.N), self.b, self.N)
+        K = hashlib.sha256(str(S)).hexdigest()
+        print(['Login failed', 'Login successful'][mac == hmac_sha256(K, self.salt)])
+
+# Simplified SRP - adversary server that cracks pw
+class SimpleSRPAdvServer(SimpleSRP):
+    def __init__(self, email, pw):
+        super(SimpleSRPAdvServer, self).__init__(email, '')
