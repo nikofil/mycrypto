@@ -502,20 +502,32 @@ class DHBot(object):
         msg = msg[:-padlen]
         print('A received msg: "%s" with len %d' % (a2s(msg), len(msg)))
 
-# DH adversary
+# DH adversary parent
 class DHAdv(object):
     def set_others(self, ao, bo):
         self.ao = ao
         self.bo = bo
 
     def step1(self, p, g, A):
-        self.p = p
-        self.A = A
-        self.bo.step1(p, g, p)
+        self.bo.step1(p, g, A)
 
     def step2(self, B):
-        self.B = B
-        self.ao.step2(self.p)
+        self.ao.step2(B)
+
+    def step3(self, encr):
+        self.bo.step3(encr)
+
+    def step4(self, encr):
+        self.ao.step4(encr)
+
+# DH adversary - change public numbers to p
+class DHAdv1(DHAdv):
+    def step1(self, p, g, A):
+        self.p = p
+        super(DHAdv1, self).step1(p, g, p)
+
+    def step2(self, B):
+        super(DHAdv1, self).step2(self.p)
 
     def step3(self, encr):
         sess = sha1([0])[:16]
@@ -524,10 +536,52 @@ class DHAdv(object):
         msg = aes_dec_cbc(sess, encrm, iv)
         msg = msg[:-msg[-1]]
         print('Decrypted msg: "%s" with len %d' % (a2s(msg), len(msg)))
-        self.bo.step3(encr)
+        super(DHAdv1, self).step3(encr)
 
-    def step4(self, encr):
-        self.ao.step4(encr)
+# DH adversary - change g to 1
+class DHAdv2(DHAdv):
+    def step1(self, p, g, A):
+        self.p = p
+        super(DHAdv2, self).step1(p, 1, A)
+
+    def step3(self, encr):
+        sess = sha1([1])[:16]
+        iv = encr[-16:]
+        encrm = encr[:-16]
+        msg = aes_dec_cbc(sess, encrm, iv)
+        msg = msg[:-msg[-1]]
+        print('Decrypted msg: "%s" with len %d' % (a2s(msg), len(msg)))
+        super(DHAdv2, self).step3(encr)
+
+# DH adversary - change g to p-1
+class DHAdv3(DHAdv):
+    def step1(self, p, g, A):
+        self.p = p
+        super(DHAdv3, self).step1(p, p-1, A)
+
+    def step3(self, encr):
+        sess = sha1([1])[:16]
+        iv = encr[-16:]
+        encrm = encr[:-16]
+        msg = aes_dec_cbc(sess, encrm, iv)
+        msg = msg[:-msg[-1]]
+        print('Decrypted msg: "%s" with len %d' % (a2s(msg), len(msg)))
+        super(DHAdv3, self).step3(encr)
+
+# DH adversary - change g to p
+class DHAdv4(DHAdv):
+    def step1(self, p, g, A):
+        self.p = p
+        super(DHAdv4, self).step1(p, p, A)
+
+    def step3(self, encr):
+        sess = sha1([0])[:16]
+        iv = encr[-16:]
+        encrm = encr[:-16]
+        msg = aes_dec_cbc(sess, encrm, iv)
+        msg = msg[:-msg[-1]]
+        print('Decrypted msg: "%s" with len %d' % (a2s(msg), len(msg)))
+        super(DHAdv4, self).step3(encr)
 
 # start a DH key exchange with an optional adversary
 def do_dhke(adv=None):
