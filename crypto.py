@@ -521,17 +521,17 @@ class DHAdv(object):
         self.ao = ao
         self.bo = bo
 
-    def step1(self, p, g, A):
-        self.bo.step1(p, g, A)
+    def step1(self, *args):
+        self.bo.step1(*args)
 
-    def step2(self, B):
-        self.ao.step2(B)
+    def step2(self, *args):
+        self.ao.step2(*args)
 
-    def step3(self, encr):
-        self.bo.step3(encr)
+    def step3(self, *args):
+        self.bo.step3(*args)
 
-    def step4(self, encr):
-        self.ao.step4(encr)
+    def step4(self, *args):
+        self.ao.step4(*args)
 
 # DH adversary - change public numbers to p
 class DHAdv1(DHAdv):
@@ -663,4 +663,37 @@ class SRPBot(object):
     def step4(self, mac):
         S = pow(self.A * pow(self.v, self.u, self.N), self.b, self.N)
         K = hashlib.sha256(str(S)).hexdigest()
-        print(mac == hmac_sha256(K, self.salt))
+        print(['Login failed', 'Login successful'][mac == hmac_sha256(K, self.salt)])
+
+# Perform SRP exchange
+def do_srp(adv=None):
+    a = SRPBot('email@email.com', 'password')
+    adv = adv or SRPBot
+    b = adv('email@email.com', 'password')
+    a.set_other(b)
+    b.set_other(a)
+    a.begin()
+
+# SRP adversary - send 0 as A
+class SRPAdv1(SRPBot):
+    def __init__(self, *args):
+        super(SRPAdv1, self).__init__(None, None)
+
+    def step1(self):
+        self.other.step2('email@email.com', 0)
+
+    def step3(self, salt, B):
+        K = hashlib.sha256(str('0')).hexdigest()
+        self.other.step4(hmac_sha256(K, salt))
+
+# SRP adversary - send N as A
+class SRPAdv2(SRPBot):
+    def __init__(self, *args):
+        super(SRPAdv2, self).__init__(None, None)
+
+    def step1(self):
+        self.other.step2('email@email.com', self.N)
+
+    def step3(self, salt, B):
+        K = hashlib.sha256(str('0')).hexdigest()
+        self.other.step4(hmac_sha256(K, salt))
