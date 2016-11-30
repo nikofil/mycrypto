@@ -3,6 +3,7 @@ import string
 import time
 import struct
 import random
+import hashlib
 import requests
 import Crypto.Cipher.AES
 import sha1 as _sha1
@@ -401,6 +402,18 @@ def hmac_sha1(key, msg):
     ipad = xor([0x36]*64, key)
     return sha1(opad + sha1(ipad + msg))
 
+# HMAC SHA256
+@b_inp([0, 1])
+def hmac_sha256(key, msg):
+    sha256 = lambda x: h2a(hashlib.sha256(str(x)).hexdigest())
+    if (len(key) > 64):
+        key = sha256(key)
+    if (len(key) < 64):
+        key = key + [0]*(64 - len(key))
+    opad = xor([0x5c]*64, key)
+    ipad = xor([0x36]*64, key)
+    return sha256(opad + sha256(ipad + msg))
+
 # break HMAC SHA1 with timing side channel attack
 def break_hmac_sha1(f):
     getst = lambda x: requests.get(x).status_code
@@ -595,3 +608,59 @@ def do_dhke(adv=None):
         a.set_other(b)
         b.set_other(a)
     a.begin()
+
+# Secure Remote Password client/server
+class SRPBot(object):
+    def __init__(self, email, pw):
+        self.N = \
+        int('ffffffffffffffffc90fdaa22168c234c4c6628b80dc'
+            '1cd129024e088a67cc74020bbea63b139b22514a0879'
+            '8e3404ddef9519b3cd3a431b302b0a6df25f14374fe1'
+            '356d6d51c245e485b576625e7ec6f44c42e9a637ed6b'
+            '0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b'
+            '1fe649286651ece45b3dc2007cb8a163bf0598da4836'
+            '1c55d39a69163fa8fd24cf5f83655d23dca3ad961c62'
+            'f356208552bb9ed529077096966d670c354e4abc9804'
+            'f1746c08ca237327ffffffffffffffff', 16)
+        self.g = 2
+        self.k = 3
+        self.email = email
+        self.pw = pw
+
+    def set_other(self, other):
+        self.other = other
+
+    def begin(self):
+        self.salt = str(random.randint(0, 100000000000))
+        xH = hashlib.sha256(self.salt + self.pw).hexdigest()
+        x = int(xH, 16)
+        self.v = pow(self.g, x, self.N)
+        self.other.step1()
+
+    def step1(self):
+        self.a = random.randint(0, self.N)
+        self.A = pow(self.g, self.a, self.N)
+        self.other.step2(self.email, self.A)
+
+    def step2(self, email, A):
+        self.b = random.randint(0, self.N)
+        self.A = A
+        self.B = self.k*self.v + pow(self.g, self.b, self.N)
+        uH = hashlib.sha256('%x%x' % (A, self.B)).hexdigest()
+        self.u = int(uH, 16)
+        self.other.step3(self.salt, self.B)
+
+    def step3(self, salt, B):
+        self.B = B
+        uH = hashlib.sha256('%x%x' % (self.A, B)).hexdigest()
+        self.u = int(uH, 16)
+        xH = hashlib.sha256(salt + self.pw).hexdigest()
+        x = int(xH, 16)
+        S = pow(B - self.k*pow(self.g, x, self.N), self.a + self.u*x, self.N)
+        K = hashlib.sha256(str(S)).hexdigest()
+        self.other.step4(hmac_sha256(K, salt))
+
+    def step4(self, mac):
+        S = pow(self.A * pow(self.v, self.u, self.N), self.b, self.N)
+        K = hashlib.sha256(str(S)).hexdigest()
+        print(mac == hmac_sha256(K, self.salt))
