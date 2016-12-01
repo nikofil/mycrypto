@@ -448,7 +448,7 @@ def dh(B=None, p=None, g=None):
             'f356208552bb9ed529077096966d670c354e4abc9804'
             'f1746c08ca237327ffffffffffffffff', 16)
     g = g or 2
-    a = random.randint(0, p)
+    a = random.randint(1, p)
     A = pow(g, a, p)
     if B is None:
         B, sess = dh(A)
@@ -475,7 +475,7 @@ class DHBot(object):
             'f356208552bb9ed529077096966d670c354e4abc9804'
             'f1746c08ca237327ffffffffffffffff', 16)
         self.g = 2
-        self.a = random.randint(0, self.p)
+        self.a = random.randint(1, self.p)
         self.A = pow(self.g, self.a, self.p)
         self.other.step1(self.p, self.g, self.A)
 
@@ -483,7 +483,7 @@ class DHBot(object):
         self.p = p
         self.g = g
         self.A = A
-        self.b = random.randint(0, p)
+        self.b = random.randint(1, p)
         self.B = pow(g, self.b, p)
         self.sess = pow(A, self.b, p)
         self.aes_key = sha1(i2a(self.sess))[:16]
@@ -638,12 +638,12 @@ class SRPBot(object):
         self.other.step1()
 
     def step1(self):
-        self.a = random.randint(0, self.N)
+        self.a = random.randint(1, self.N)
         self.A = pow(self.g, self.a, self.N)
         self.other.step2(self.email, self.A)
 
     def step2(self, email, A):
-        self.b = random.randint(0, self.N)
+        self.b = random.randint(1, self.N)
         self.A = A
         self.B = self.k*self.v + pow(self.g, self.b, self.N)
         uH = hashlib.sha256('%x%x' % (A, self.B)).hexdigest()
@@ -702,7 +702,7 @@ class SRPAdv2(SRPBot):
 # Simplified SRP
 class SimpleSRP(SRPBot):
     def step2(self, email, A):
-        self.b = random.randint(0, self.N)
+        self.b = random.randint(1, self.N)
         self.A = A
         self.B = pow(self.g, self.b, self.N)
         self.u = int(a2h(randr(16)), 16)
