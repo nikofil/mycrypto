@@ -668,9 +668,12 @@ class SRPBot(object):
 # Perform SRP exchange
 def do_srp(client=None, server=None):
     server = server or SRPBot
-    a = server('email@email.com', 'password')
+    r = random.randint(1, 1000)
+    pw = 'password %d' % r
+    print('The password is: %s' % pw)
+    a = server('email@email.com', pw)
     client = client or SRPBot
-    b = client('email@email.com', 'password')
+    b = client('email@email.com', pw)
     a.set_other(b)
     b.set_other(a)
     a.begin()
@@ -726,3 +729,17 @@ class SimpleSRP(SRPBot):
 class SimpleSRPAdvServer(SimpleSRP):
     def __init__(self, email, pw):
         super(SimpleSRPAdvServer, self).__init__(email, '')
+
+    def step4(self, mac):
+        def pgen():
+            for i in range(1000):
+                yield 'password %d' % i
+        for p in pgen():
+            xH = hashlib.sha256(self.salt + p).hexdigest()
+            x = int(xH, 16)
+            self.v = pow(self.g, x, self.N)
+            S = pow(self.A * pow(self.v, self.u, self.N), self.b, self.N)
+            K = hashlib.sha256(str(S)).hexdigest()
+            if mac == hmac_sha256(K, self.salt):
+                print('Successfully cracked: %s' % p)
+                break
