@@ -6,6 +6,7 @@ import random
 import hashlib
 import requests
 import Crypto.Cipher.AES
+import pyprimes
 import sha1 as _sha1
 import md4 as _md4
 
@@ -73,6 +74,16 @@ xor = b_inp([0, 1])(lambda x, y: list(imap(operator.xor, x, cycle(y))))
 score = lambda x: reduce(operator.add, map(lambda y: freq[y] if y in freq else 0, x.lower()))
 # hamming distance of two arrays
 hamm = lambda x, y: sum([bin(x ^ y).count('1') for (x, y) in zip(x, y)])
+# string to int
+s2i = b_inp([0])(lambda x: reduce(lambda y, z: y*256+z, x))
+# int to string
+@b_inp([0])
+def i2s(x):
+    r = ''
+    while x > 0:
+        r = chr(x%256) + r
+        x /= 256
+    return r
 # most likely key length in range
 most_likely_len = lambda c, r: sorted([(l, float(hamm(break_pieces(c, l)[0], break_pieces(c, l)[1]))/l) for l in r], key=operator.itemgetter(1))
 # crack repeating xor cipher
@@ -743,3 +754,43 @@ class SimpleSRPAdvServer(SimpleSRP):
             if mac == hmac_sha256(K, self.salt):
                 print('Successfully cracked: %s' % p)
                 break
+
+# prime table primegen
+def table_primegen(n=1000):
+    r = range(2, n)
+    for i in r:
+        j = i*2
+        while j < n:
+            if j in r:
+                r.remove(j)
+            j += i
+    return random.choice(r)
+
+# Miller-Rabin primegen
+mr_primegen = lambda: next(x for x in (random.randint(2**500, 2**600) for _ in iter(int, 1)) if pyprimes.miller_rabin(x))
+
+# modular inverse
+def invmod(b, a):
+    s, so, t, to, r, ro = [0, 1, 1, 0, b, a]
+    while r != 0:
+        q = ro / r
+        ro, r = [r, ro - q*r]
+        so, s = [s, so - q*s]
+        to, t = [t, to - q*t]
+    if ro != 1:
+        return None
+    return to % a
+
+# RSA implementation
+def rsa(primegen=mr_primegen, e=3):
+    while True:
+        p = primegen()
+        q = primegen()
+        n = p*q
+        et = (p-1)*(q-1)
+        d = invmod(e, et)
+        if d:
+            break
+    public = (e, n)
+    private = (d, n)
+    return (public, private)
