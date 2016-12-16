@@ -794,3 +794,34 @@ def rsa(primegen=mr_primegen, e=3):
     public = (e, n)
     private = (d, n)
     return (public, private)
+
+# nth root of k
+def iroot(n, k):
+    u, s = n, n+1
+    while u < s:
+        s = u
+        t = (k-1) * s + n / pow(s, k-1)
+        u = t / k
+    return s
+
+# RSA CRT attack with small exp
+def rsa_crt_attack():
+    # only need public keys
+    na = rsa(e=3)[0][1]
+    nb = rsa(e=3)[0][1]
+    nc = rsa(e=3)[0][1]
+    # secret message
+    m = random.randint(1000, min([na, nb, nc]))
+    # encrypt message 3 times with RSA
+    ca = pow(m, 3, na)
+    cb = pow(m, 3, nb)
+    cc = pow(m, 3, nc)
+    # use Chinese Remainder Theorem to find c so that:
+    # c = ca mod na, c = cb mod nb, c = cc mod nc
+    N = na*nb*nc
+    Na, Nb, Nc = N/na, N/nb, N/nc
+    ta = ca*Na*invmod(Na, na)
+    tb = cb*Nb*invmod(Nb, nb)
+    tc = cc*Nc*invmod(Nc, nc)
+    c = (ta+tb+tc) % N
+    print "Message guessed:", iroot(c, 3) == m
