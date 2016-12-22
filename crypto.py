@@ -825,3 +825,14 @@ def rsa_crt_attack():
     tc = cc*Nc*invmod(Nc, nc)
     c = (ta+tb+tc) % N
     print "Message guessed:", iroot(c, 3) == m
+
+# CCA2 attack on RSA
+def rsa_oracle_attack():
+    pub, prv = rsa(e=65537)
+    m = random.randint(0, 100000000000)
+    s = random.randint(2, 1000)
+    c = pow(m, *pub)
+    c2 = (c * pow(s, pub[0], pub[1])) % pub[1]
+    m2 = pow(c2, *prv)
+    guessed = (m2 * invmod(s, pub[1])) % pub[1]
+    print "Message guessed:", guessed == m
