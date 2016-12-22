@@ -67,7 +67,7 @@ b64 = lambda x: b64encode(''.join(map(chr, x)))
 # base64 decode to array
 u64 = lambda x: map(ord, b64decode(x))
 # int to int array
-i2a = lambda x: [int(a, 16) for a in break_pieces(('%x' % x).zfill(2), 2)]
+i2a = lambda x: [int(a, 16) for a in break_pieces(('%x' % x).zfill((len('%x' % x) + 1) & ~1), 2)]
 # xor msg array with key array
 xor = b_inp([0, 1])(lambda x, y: list(imap(operator.xor, x, cycle(y))))
 # score of an array based on freq
@@ -836,3 +836,35 @@ def rsa_oracle_attack():
     m2 = pow(c2, *prv)
     guessed = (m2 * invmod(s, pub[1])) % pub[1]
     print "Message guessed:", guessed == m
+
+# Bleichenbacher RSA signature forgery attack
+def rsa_bleich_attack():
+    pub, _ = rsa(e=3)
+
+    def validate_sig(m, sig, pub):
+        cs = sha1(m)
+        msig = pow(sig, *pub)
+        a = i2a(msig)[1:]
+        if a[0] != 0 or a[1] != 1:
+            return 999
+        i = 2
+        while a[i] == 0xFF:
+            i += 1
+        if a[i] != 0 or a[i+1:i+9] != [12,34,56,78,90,91,23,45]:
+            return 999
+        same = [x[0] == x[1] for x in zip(cs, a[i+9:i+29])]
+        return same.count(False)
+
+    m = 'hi mom'
+    sig = [1,0,1,0xFF,0,12,34,56,78,90,91,23,45] + sha1(m)
+    diff = validate_sig(m, iroot(s2i(sig), 3), pub)
+    while diff > 0:
+        print "Different bytes: ", diff
+        # add FF bytes until floor(cube_root(sig))**3
+        # matches with the plaintext produced when validate_sig
+        # tries to decrypt sig by applying the public key
+        # which exps to the power of e=3
+        # this way the private key is not needed for the signature
+        sig += [0xFF]
+        diff = validate_sig(m, iroot(s2i(sig), 3), pub)
+    print "All same! Sig: ", sig
