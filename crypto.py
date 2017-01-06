@@ -364,6 +364,9 @@ sha1 = b_inp([0])(lambda x: h2a(_sha1.sha1(a2s(x))))
 # SHA1 HMAC
 sha1_mac = b_inp([0, 1])(lambda key, msg: sha1(key + msg))
 
+# SHA1 to int
+sha1i = lambda msg: int(a2h(sha1(msg)), 16)
+
 # SHA1 create padding for message of length
 sha1_pad_len = lambda l: [1 << 7] + [0]*((64 - ((l + 9) % 64)) % 64) + s2a(struct.pack('>Q', l * 8))
 
@@ -868,3 +871,32 @@ def rsa_bleich_attack():
         sig += [0xFF]
         diff = validate_sig(m, iroot(s2i(sig), 3), pub)
     print "All same! Sig: ", sig
+
+p_DSA = 0x800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1
+ 
+q_DSA = 0xf4f47f05794b256174bba6e9b396a7707e563c5b
+ 
+g_DSA = 0x5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119458fef538b8fa4046c8db53039db620c094c9fa077ef389b5322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a0470f5b64c36b625a097f1651fe775323556fe00b3608c887892878480e99041be601a62166ca6894bdd41a7054ec89f756ba9fc95302291
+
+# Sign message with DSA
+def dsa_sign(m, p=p_DSA, q=q_DSA, g=g_DSA, k = random.randint(1, q_DSA-1)):
+    x = random.randint(1, q-1)
+    y = pow(g, x, p)
+    r = pow(g, k, p) % q
+    s = (invmod(k, q) * (sha1i(m) + x*r)) % q
+    return (r, s, y)
+
+# Verify message with DSA
+def dsa_verify(m, r, s, y, p=p_DSA, q=q_DSA, g=g_DSA):
+    w = invmod(s, q)
+    u1 = (sha1i(m) * w) % q
+    u2 = (r * w) % q
+    v = ((pow(g, u1, p) * pow(y, u2, p)) % p) % q
+    return r == v
+
+# Find secret key x from k and a signature
+def dsa_get_secret(m, k, r, s, y=None, p=p_DSA, q=q_DSA, g=g_DSA):
+    x = (s*k - sha1i(m)) * invmod(r, q) % q
+    if y and y != pow(g, x, p):
+        return None
+    return x
