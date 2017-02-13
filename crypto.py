@@ -900,3 +900,12 @@ def dsa_get_secret(m, k, r, s, y=None, p=p_DSA, q=q_DSA, g=g_DSA):
     if y and y != pow(g, x, p):
         return None
     return x
+
+# Find k and secret key of DSA from 2 messages with the same k
+def dsa_find_k(m1, s1, m2, s2, g, p, q):
+    d1 = (m1 - m2) % q
+    d2 = (s1 - s2) % q
+    k = (d1 * invmod(d2, q)) % q
+    r = pow(g, k, p) % q
+    x = ((s1 * k - m1) * invmod(r, q)) % q
+    return (k, x)
