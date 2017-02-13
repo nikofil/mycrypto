@@ -909,3 +909,24 @@ def dsa_find_k(m1, s1, m2, s2, g, p, q):
     r = pow(g, k, p) % q
     x = ((s1 * k - m1) * invmod(r, q)) % q
     return (k, x)
+
+# RSA last bit decryption oracle
+def rsa_last_bit_oracle(priv_key):
+    def oracle(x):
+        return pow(x, *priv_key) & 1
+    return oracle
+
+# Decrypt RSA encrypted message using last bit oracle
+def rsa_decrypt_lastbit(ctxt, oracle, e, n):
+    lo = 0
+    hi = n-1
+    mult = pow(2, e, n)
+    while lo < hi:
+        print(lo, hi)
+        ctxt = (ctxt*mult) % n
+        # if by doubling, the last bit is 1 because of the modulus with n which is odd, this means 2*ctxt > n, otherwise < n 
+        if oracle(ctxt) == 1:
+            lo=(hi+lo)/2 + 1
+        else:
+            hi=(hi+lo)/2
+    return lo, hi
