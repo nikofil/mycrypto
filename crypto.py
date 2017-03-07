@@ -112,6 +112,8 @@ aes_enc_ecb = b_inp([0, 1])(lambda key, txt: s2a(Crypto.Cipher.AES.new(a2s(key),
 aes_dec_ecb = b_inp([0, 1])(lambda key, txt: s2a(Crypto.Cipher.AES.new(a2s(key), Crypto.Cipher.AES.MODE_ECB).decrypt(a2s(txt))))
 # PKCS7 padding
 pad_to = b_inp([0])(lambda x, l: x + [l - (len(x) % l)] * (l - (len(x) % l)))
+# PKCS1v1.5 padding
+pkcs15 = b_inp([0])(lambda x, l: [0, 2] + [r if r != 0 else 1 for r in randr(l - len(x) - 3)] + [0] + x)
 
 # encrypt AES CBC
 @b_inp([0, 1, 2])
@@ -930,3 +932,11 @@ def rsa_decrypt_lastbit(ctxt, oracle, e, n):
         else:
             hi=(hi+lo)/2
     return lo, hi
+
+# RSA PKCS1v1.5 padding oracle
+def pkcs15_oracle(d, n):
+    def oracle(ctxt, l):
+        ptxt = i2a(pow(ctxt, d, n))
+        ptxt = [0]*(l - len(ptxt)) + ptxt
+        return ptxt[:2] == [0, 2]
+    return oracle
