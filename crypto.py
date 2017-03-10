@@ -934,9 +934,13 @@ def rsa_decrypt_lastbit(ctxt, oracle, e, n):
     return lo, hi
 
 # RSA PKCS1v1.5 padding oracle
-def pkcs15_oracle(d, n):
-    def oracle(ctxt, l):
+def pkcs15_oracle(l, d, n):
+    def oracle(ctxt):
         ptxt = i2a(pow(ctxt, d, n))
         ptxt = [0]*(l - len(ptxt)) + ptxt
         return ptxt[:2] == [0, 2]
     return oracle
+
+
+def rsa_bleich_pkcs_attack(ctxt, oracle, e, n):
+    pass
