@@ -843,7 +843,7 @@ def rsa_oracle_attack():
     print "Message guessed:", guessed == m
 
 # Bleichenbacher RSA signature forgery attack
-def rsa_bleich_attack():
+def rsa_bleich_e3_attack():
     pub, _ = rsa(e=3)
 
     def validate_sig(m, sig, pub):
@@ -942,5 +942,60 @@ def pkcs15_oracle(l, d, n):
     return oracle
 
 
-def rsa_bleich_pkcs_attack(ctxt, oracle, e, n):
-    pass
+# 128bit primegen
+mr_primegen_128 = lambda: next(x for x in (random.randint(2**127, 2**128) for _ in iter(int, 1)) if pyprimes.miller_rabin(x))
+
+# Bleichenbacher98 attack with RSA pkcs1.5 padding oracle
+def rsa_bleich_pkcs_attack(ctxt, oracle, k, e, n):
+    B = 2**(k-2)
+    cs = 0
+    while not oracle(cs):
+        s0 = random.randint(2, n)
+        cs = (ctxt * pow(s0, e, n)) % n
+    c0 = cs
+    M = [[(2*B, 3*B-1)]]
+    i = 1
+    s = []
+    
+    while True:
+        if i == 1:
+            s1 = (n + 3*B - 1)/(3*B)
+            cs = (c0 * pow(s1, e, n)) % n
+            while not oracle(cs):
+                s1 += 1
+                cs = (c0 * pow(s1, e, n)) % n
+            print("Found s1")
+            s.append(s1)
+        elif len(M[-1]) > 1:
+            raise Exception("Many ranges")
+        else:
+            a, b = M[-1][0]
+            sl = s[-1]
+            r = ((2 * (b * sl - 2 * B) + n - 1) / n)
+            sn = (2*B + r*n + b - 1) / b
+            cs = 0
+            while True:
+                cs = (c0 * pow(sn, e, n)) % n
+                if oracle(cs):
+                    break
+                elif sn * a < 3*B + r*n:
+                    sn += 1
+                else:
+                    r += 1
+                    sn = (2*B + r*n + b - 1) / b
+            print("Found sn")
+            s.append(sn)
+        Mn = []
+        sc = s[-1]
+        for Ml in M[-1]:
+            a, b = Ml
+            for r in range((a * sc - 3*B + 1 + n - 1) / n, (b * sc - 2 * B) / n + 1):
+                print(b, B, r, n, sc)
+                Mstart = max(a, (2*B + r*n + sc - 1) / sc)
+                Mend = min(b, (3*B - 1 + r*n) / sc)
+                Mn.append((Mstart, Mend))
+        print("Mn", Mn)
+        M.append(Mn)
+        if len(Mn) == 1 and Mn[0][0] == Mn[0][1]:
+            break
+        i += 1
