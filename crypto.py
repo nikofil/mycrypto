@@ -942,8 +942,8 @@ def pkcs15_oracle(l, d, n):
     return oracle
 
 
-# 128bit primegen
-mr_primegen_128 = lambda: next(x for x in (random.randint(2**127, 2**128) for _ in iter(int, 1)) if pyprimes.miller_rabin(x))
+# variable bit primegen
+mr_primegen_bits = lambda bits: lambda: next(x for x in (random.randint(2**(bits-1), 2**bits) for _ in iter(int, 1)) if pyprimes.miller_rabin(x))
 
 # Division round up
 divup = lambda n, d: (n + d - 1) / d
@@ -969,7 +969,10 @@ def rsa_bleich_pkcs_attack(ctxt, oracle, k, e, n):
                 cs = (c0 * pow(s1, e, n)) % n
             s.append(s1)
         elif len(M[-1]) > 1:
-            raise Exception("Many ranges")
+            sn = s[-1] + 1
+            while not oracle((c0 * pow(sn, e, n)) % n):
+                sn += 1
+            s.append(sn)
         else:
             a, b = M[-1][0]
             sl = s[-1]
@@ -1004,11 +1007,12 @@ def rsa_bleich_pkcs_attack(ctxt, oracle, k, e, n):
 
 
 # Demonstrate above attack
-def do_bleichenbacher98_attack():
+def do_bleichenbacher98_attack(bits):
+    #Good bits values: 256 (easy), 768 (harder)
     pub = (0, 0)
-    while len(bin(pub[1])) - 2 != 256:
-        pub, prv = rsa(mr_primegen_128)
-    byte_len = 32
+    while len(bin(pub[1])) - 2 != bits:
+        pub, prv = rsa(mr_primegen_bits(bits/2))
+    byte_len = bits/8
     ptxt = pkcs15('kick it, CC', byte_len)
     ctxt = pow(s2i(ptxt), *pub)
     oracle = pkcs15_oracle(byte_len, *prv)
