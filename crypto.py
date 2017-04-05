@@ -945,9 +945,12 @@ def pkcs15_oracle(l, d, n):
 # 128bit primegen
 mr_primegen_128 = lambda: next(x for x in (random.randint(2**127, 2**128) for _ in iter(int, 1)) if pyprimes.miller_rabin(x))
 
+# Division round up
+divup = lambda n, d: (n + d - 1) / d
+
 # Bleichenbacher98 attack with RSA pkcs1.5 padding oracle
 def rsa_bleich_pkcs_attack(ctxt, oracle, k, e, n):
-    B = 2**(k-2)
+    B = 2**(8*(k-2))
     cs = 0
     while not oracle(cs):
         s0 = random.randint(2, n)
@@ -959,20 +962,19 @@ def rsa_bleich_pkcs_attack(ctxt, oracle, k, e, n):
     
     while True:
         if i == 1:
-            s1 = (n + 3*B - 1)/(3*B)
+            s1 = divup(n, 3*B)
             cs = (c0 * pow(s1, e, n)) % n
             while not oracle(cs):
                 s1 += 1
                 cs = (c0 * pow(s1, e, n)) % n
-            print("Found s1")
             s.append(s1)
         elif len(M[-1]) > 1:
             raise Exception("Many ranges")
         else:
             a, b = M[-1][0]
             sl = s[-1]
-            r = ((2 * (b * sl - 2 * B) + n - 1) / n)
-            sn = (2*B + r*n + b - 1) / b
+            r = divup(2 * (b * sl - 2 * B), n)
+            sn = divup(2*B + r*n, b)
             cs = 0
             while True:
                 cs = (c0 * pow(sn, e, n)) % n
@@ -982,20 +984,34 @@ def rsa_bleich_pkcs_attack(ctxt, oracle, k, e, n):
                     sn += 1
                 else:
                     r += 1
-                    sn = (2*B + r*n + b - 1) / b
-            print("Found sn")
+                    sn = divup(2*B + r*n, b)
             s.append(sn)
         Mn = []
         sc = s[-1]
         for Ml in M[-1]:
             a, b = Ml
-            for r in range((a * sc - 3*B + 1 + n - 1) / n, (b * sc - 2 * B) / n + 1):
-                print(b, B, r, n, sc)
-                Mstart = max(a, (2*B + r*n + sc - 1) / sc)
+            for r in range(divup(a * sc - 3*B + 1, n), (b * sc - 2 * B) / n + 1):
+                Mstart = max(a, divup(2*B + r*n, sc))
                 Mend = min(b, (3*B - 1 + r*n) / sc)
                 Mn.append((Mstart, Mend))
-        print("Mn", Mn)
         M.append(Mn)
         if len(Mn) == 1 and Mn[0][0] == Mn[0][1]:
-            break
+            a = Mn[0][0]
+            m = (a * invmod(s0, n)) % n
+            print "Found m =", m
+            return m
         i += 1
+
+
+# Demonstrate above attack
+def do_bleichenbacher98_attack():
+    pub = (0, 0)
+    while len(bin(pub[1])) - 2 != 256:
+        pub, prv = rsa(mr_primegen_128)
+    byte_len = 32
+    ptxt = pkcs15('kick it, CC', byte_len)
+    ctxt = pow(s2i(ptxt), *pub)
+    oracle = pkcs15_oracle(byte_len, *prv)
+    m = rsa_bleich_pkcs_attack(ctxt, oracle, byte_len, *pub)
+    m = i2s(m)
+    print "Recovered message:", m[(m.find('\x00') + 1):]
