@@ -1019,3 +1019,20 @@ def do_bleichenbacher98_attack(bits):
     m = rsa_bleich_pkcs_attack(ctxt, oracle, byte_len, *pub)
     m = i2s(m)
     print "Recovered message:", m[(m.find('\x00') + 1):]
+
+# CBC Mac impl
+cbc_mac = lambda msg, key, iv: aes_enc_cbc(key, pad_to(msg, 16), iv)[-16:]
+
+def verify_cbc_mac_oracle(key):
+    def verify(msg, mac, iv=[0]):
+        return cbc_mac(msg, key, iv) == mac
+    return verify
+
+def attack_cbc_mac():
+    key = randr(16)
+    iv = randr(16)
+    original = "from=1000&to=1001&amount=1000000"
+    mac = cbc_mac(original, key, iv)
+    oracle = verify_cbc_mac_oracle(key)
+    new_iv = xor(xor("from=1000&to=1001&amount=1000000", "from=6666&to=1001&amount=1000000"), iv)
+    assert oracle("from=6666&to=1001&amount=1000000", mac, new_iv)
