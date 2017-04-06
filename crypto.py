@@ -1028,6 +1028,7 @@ def verify_cbc_mac_oracle(key):
         return cbc_mac(msg, key, iv) == mac
     return verify
 
+# attack on CBC_MAC by controlling IV
 def attack_cbc_mac():
     key = randr(16)
     iv = randr(16)
@@ -1036,3 +1037,32 @@ def attack_cbc_mac():
     oracle = verify_cbc_mac_oracle(key)
     new_iv = xor(xor("from=1000&to=1001&amount=1000000", "from=6666&to=1001&amount=1000000"), iv)
     assert oracle("from=6666&to=1001&amount=1000000", mac, new_iv)
+
+# attack on cbc_mac using static IV
+def attack_cbc_mac_staticiv():
+    key = randr(16)
+    original = "from=1000&txlist=100:123;200:456"
+    mac = cbc_mac(original, key, [0])
+    oracle = verify_cbc_mac_oracle(key)
+    assert(oracle(original, mac))
+    forged = "from=6666&txlist=6666:123"
+    forged_mac = cbc_mac(forged, key, [0])
+    forged = pad_to(forged, 16)
+    forged2 = forged + xor(s2a(original[:16]), forged_mac) + s2a(original[16:])
+    assert cbc_mac(forged2, key, [0]) == mac
+    forged2 = pad_to(forged2, 16) + s2a(';6666:1000000')
+    spoofed_mac = cbc_mac(forged2, key, [0])
+    forged_original = pad_to(original, 16) + s2a(';6666:1000000')
+    assert oracle(forged_original, spoofed_mac)
+    assert a2s(forged2).startswith('from=6666')
+    print(map(chr, forged_original))
+
+# 2nd preimage attack on cbc_mac
+def cbc_mac_2nd_preimg():
+    msg = "alert('MZA who was that?');\n"
+    key = 'YELLOW SUBMARINE'
+    spoof = "alert('Ayo, the Wu is back!');\n//"
+    spoof_mac_1 = cbc_mac(spoof, key, [0])
+    spoof = pad_to(spoof, 16) + xor(spoof_mac_1, s2a(msg[:16])) + s2a(msg[16:])
+    assert cbc_mac(spoof, key, [0]) == cbc_mac(msg, key, [0])
+    print(spoof)
