@@ -1140,18 +1140,40 @@ def MDbad(x, length, H=None):
     return H
 
 # Find exponentially (with depth) many collisions
-def MDbad_gen_col(depth, H=None):
+def MDbad_gen_col(depth, H=None, output=True):
+    print "Depth", depth
     while True:
         a = randr(3)
         b = randr(3)
         if a != b and MDbad(a,2,H) == MDbad(b,2,H):
-            print "Collided", a, b, "with hash", MDbad(a,2,H), "and seed", H
+            if output:
+                print "Collided", a, b, "with hash", MDbad(a,2,H), "and seed", H
             if depth == 1:
                 yield a
                 yield b
                 return
             else:
-                for n in MDbad_gen_col(depth-1, MDbad(a,2,H)):
+                for n in MDbad_gen_col(depth-1, MDbad(a,2,H), output):
                     yield a + n
                     yield b + n
                 return
+
+# Find collisions of concat of MDbad with len 2 and MDbad with len 5
+def MDbad_concat_gen_col():
+    # birthday problem says we have an 83% chance to find a 5 byte collision in 2000000 attempts
+    # log2(2000000) ~= 21
+    # Generate many easy collisions for MDbad with len 2 with above func and use these
+    # to find a collision for len 5 to decrease complexity significantly
+    # This proves concat of collision unsafe funcs to be also collision unsafe
+    prev = []
+    prevset = set([])
+    for x in MDbad_gen_col(21, None, False):
+        hx = MDbad(x, 5)
+        if tuple(hx) in prevset:
+            for y, hy in prev:
+                if hx == hy:
+                    assert MDbad(x, 2) + MDbad(x, 5) == MDbad(y, 2) + MDbad(y, 5)
+                    print "Found collision", x, y
+                    return (x, y)
+        prev.append((x, hx))
+        prevset.add(tuple(hx))
