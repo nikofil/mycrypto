@@ -7,6 +7,8 @@ import hashlib
 import requests
 import Crypto.Cipher.AES
 import pyprimes
+import salsa20
+import zlib
 import sha1 as _sha1
 import md4 as _md4
 
@@ -1066,3 +1068,65 @@ def cbc_mac_2nd_preimg():
     spoof = pad_to(spoof, 16) + xor(spoof_mac_1, s2a(msg[:16])) + s2a(msg[16:])
     assert cbc_mac(spoof, key, [0]) == cbc_mac(msg, key, [0])
     print(spoof)
+
+# Stream cipher encrypted compressed ptxt length oracle
+def breach_oracle_stream(content):
+    ptxt = "POST / HTTP/1.1\nHost: hapless.com\n"\
+    "Cookie: sessionid=TmV2ZXIgcmV2ZWFsIHRoZSBXdS1UYW5nIFNlY3JldCE=\n"\
+    "Content-Length: {}\n{}".format(len(content), content)
+    comp = zlib.compress(ptxt)
+    iv = randr(24)
+    key = randr(32)
+    ctxt = salsa20.XSalsa20_xor(comp, a2s(iv), a2s(key))
+    return len(ctxt)
+
+# Guess sessionid using an attack similar to BREACH on above oracle
+def breach_attack_stream():
+    s = 'sessionid='
+    for i in range(22):
+        best = 100000
+        bestc = ''
+        for l in product(string.ascii_letters + string.digits + '=', repeat=2):
+            l = ''.join(l)
+            if breach_oracle_stream(s+l) < best:
+                best = breach_oracle_stream(s+l)
+                bestc = l
+        s += bestc
+        print(s)
+
+# Block cipher encrypted compressed ptxt length oracle
+def breach_oracle_block(content):
+    ptxt = "POST / HTTP/1.1\nHost: hapless.com\n"\
+    "Cookie: sessionid=TmV2ZXIgcmV2ZWFsIHRoZSBXdS1UYW5nIFNlY3JldCE=\n"\
+    "Content-Length: {}\n{}".format(len(content), content)
+    comp = zlib.compress(ptxt)
+    iv = randr(16)
+    key = randr(16)
+    ctxt = aes_enc_cbc(a2s(key), pad_to(comp, 16), a2s(iv))
+    return len(ctxt)
+
+# Guess sessionid using an attack similar to BREACH on above oracle
+def breach_attack_block():
+    s = 'sessionid='
+    prefixidx = 0
+    i = 0
+    while i < 44:
+        best = 100000
+        worst = 0
+        bestc = ''
+        for l in string.ascii_letters + string.digits + '=':
+            cost = breach_oracle_block(s+l) 
+            if cost < best:
+                best = cost
+                bestc = l
+            if cost > worst:
+                worst = cost
+        if best == worst:
+            s = string.printable[prefixidx] + s
+            prefixidx += 1
+            continue
+        s = s[prefixidx:]
+        prefixidx = 0
+        s += bestc
+        i += 1
+        print(s)
