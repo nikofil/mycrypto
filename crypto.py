@@ -1130,3 +1130,28 @@ def breach_attack_block():
         s += bestc
         i += 1
         print(s)
+
+# Bad 16bit MD hash function
+def MDbad(x, length, H=None):
+    H = H or [10*(i+1) for i in range(length)]
+    iv = range(16)
+    for i in x:
+        H = aes_enc_cbc(pad_to(H, 16), pad_to([i], 16), iv)[-length:]
+    return H
+
+# Find exponentially (with depth) many collisions
+def MDbad_gen_col(depth, H=None):
+    while True:
+        a = randr(3)
+        b = randr(3)
+        if a != b and MDbad(a,2,H) == MDbad(b,2,H):
+            print "Collided", a, b, "with hash", MDbad(a,2,H), "and seed", H
+            if depth == 1:
+                yield a
+                yield b
+                return
+            else:
+                for n in MDbad_gen_col(depth-1, MDbad(a,2,H)):
+                    yield a + n
+                    yield b + n
+                return
