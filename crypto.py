@@ -1209,7 +1209,13 @@ def MDbad_expendable_msgs():
         bridge = randr(3)
         if MDbad(bridge, 2, prevstate) in interms:
             break
-    idx = interms.index(MDbad(bridge, 2, prevstate)) + 1
-    assert MDbad(bridge + targetmsg[idx*3:], 2, prevstate) == targetlast
-    print "Found collision"
+    idx = interms.index(MDbad(bridge, 2, prevstate))
     # The collision is a combination of shorts and longs that adds up to `idx` length
+    wherelongs = bin(idx-7)[2:]
+    while len(wherelongs) < 7:
+        wherelongs = '0'+wherelongs
+    prefix = [shorts[i] if wherelongs[i] == '0' else longs[i] for i in range(7)]
+    prefix = reduce(lambda x, y: x+y, prefix)
+    fakemsg = prefix + bridge + targetmsg[(idx+1)*3:]
+    assert fakemsg != targetmsg and len(fakemsg) == len(targetmsg) and MDbad(fakemsg, 2) == MDbad(targetmsg, 2)
+    print "Found collision (both have MDbad = {})".format(MDbad(fakemsg, 2)), fakemsg, targetmsg
