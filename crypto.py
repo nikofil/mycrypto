@@ -22,33 +22,6 @@ s2a = lambda x: [ord(x) for x in x]
 # int array to str
 a2s = lambda a: ''.join([chr(x) for x in a])
 
-# start HMAC server
-if __name__ == '__main__':
-    from flask import Flask, request
-    app = Flask(__name__)
-    hmac_key = randr(64)
-
-    @app.route('/hmac')
-    def hmac():
-        with open(request.args.get('file')) as f:
-            x = f.read()
-        signature = h2a(request.args.get('signature'))
-        s1 = hmac_sha1(hmac_key, x)
-        for i, j in zip(signature+[0]*30, s1):
-            if i != j:
-                return ('no', 500)
-            time.sleep(0.005)
-        return ('ok', 200)
-
-    @app.route('/')
-    def ind():
-        with open(request.args.get('file')) as f:
-            x = f.read()
-        s1 = hmac_sha1(hmac_key, x)
-        return a2h(s1)
-
-    app.run(port=8081, processes=10)
-
 # decorator to translate strings to int arrays
 def b_inp(r):
     def wrapper(f):
@@ -1080,6 +1053,33 @@ def breach_oracle_stream(content):
     ctxt = salsa20.XSalsa20_xor(comp, a2s(iv), a2s(key))
     return len(ctxt)
 
+# start HMAC server
+def start_hmac_server():
+    from flask import Flask, request
+    app = Flask(__name__)
+    hmac_key = randr(64)
+
+    @app.route('/hmac')
+    def hmac():
+        with open(request.args.get('file')) as f:
+            x = f.read()
+        signature = h2a(request.args.get('signature'))
+        s1 = hmac_sha1(hmac_key, x)
+        for i, j in zip(signature+[0]*30, s1):
+            if i != j:
+                return ('no', 500)
+            time.sleep(0.005)
+        return ('ok', 200)
+
+    @app.route('/')
+    def ind():
+        with open(request.args.get('file')) as f:
+            x = f.read()
+        s1 = hmac_sha1(hmac_key, x)
+        return a2h(s1)
+
+    app.run(port=8081, processes=10)
+
 # Guess sessionid using an attack similar to BREACH on above oracle
 def breach_attack_stream():
     s = 'sessionid='
@@ -1172,8 +1172,44 @@ def MDbad_concat_gen_col():
         if tuple(hx) in prevset:
             for y, hy in prev:
                 if hx == hy:
-                    assert MDbad(x, 2) + MDbad(x, 5) == MDbad(y, 2) + MDbad(y, 5)
+                    assert MDbad(pad_to(x,16), 2) + MDbad(pad_to(x,16), 5) == MDbad(pad_to(y,16), 2) + MDbad(pad_to(y,16), 5)
                     print "Found collision", x, y
                     return (x, y)
         prev.append((x, hx))
         prevset.add(tuple(hx))
+
+# Second preimage attack on MDbad
+def MDbad_expendable_msgs():
+    # Generate disposable message so we can easily fill in the first n blocks of the hash
+    # and get the same result
+    k = 7
+    shorts = []
+    longs = []
+    prevstate = None
+    for i in range(1, k+1):
+        a = randr(3*(2**(k-i)))
+        Ha = MDbad(a, 2, prevstate)
+        while True:
+            a2 = randr(3)
+            b = randr(3)
+            if MDbad(a2, 2, Ha) == MDbad(b, 2, prevstate):
+                shorts.append(b)
+                longs.append(a+a2)
+                prevstate = MDbad(b, 2, prevstate)
+                break
+    targetmsg = pad_to(randr(3 * (2**k)), 16)
+    targetlast = None
+    interms = []
+    for i in range(0, len(targetmsg), 3):
+        targetlast = MDbad(targetmsg[i:i+3], 2, targetlast)
+        interms.append(targetlast)
+    bridge = None
+    # Find a bridge block from our final state to one of the intermediate states of the target hash
+    while True:
+        bridge = randr(3)
+        if MDbad(bridge, 2, prevstate) in interms:
+            break
+    idx = interms.index(MDbad(bridge, 2, prevstate)) + 1
+    assert MDbad(bridge + targetmsg[idx*3:], 2, prevstate) == targetlast
+    print "Found collision"
+    # The collision is a combination of shorts and longs that adds up to `idx` length
