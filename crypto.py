@@ -1219,3 +1219,44 @@ def MDbad_expendable_msgs():
     fakemsg = prefix + bridge + targetmsg[(idx+1)*3:]
     assert fakemsg != targetmsg and len(fakemsg) == len(targetmsg) and MDbad(fakemsg, 2) == MDbad(targetmsg, 2)
     print "Found collision (both have MDbad = {})".format(MDbad(fakemsg, 2)), fakemsg, targetmsg
+
+# Nostradamus attack
+def MDbad_nostradamus():
+    k = 5
+    states = []
+    states.append([(MDbad(x, 2), x) for x in [randr(3) for _ in range(2**k)]])
+    for i in range(k):
+        print i
+        nextstate = []
+        for l in range(0, len(states[i]), 2):
+            pa = states[i][l]
+            pb = states[i][l+1]
+            pb_blk = randr(3)
+            pb_h = MDbad(pb_blk, 2, pb[0])
+            while True:
+                x = randr(3)
+                if MDbad(x, 2, pa[0]) == pb_h:
+                    break
+            # sanity check
+            assert MDbad(pa[1]+x, 2) == pb_h and MDbad(pb[1]+pb_blk, 2) == pb_h
+            nextstate.append((pb_h, pa[1] + x, pb[1] + pb_blk))
+        # funnel all initial states into a common final state
+        states.append(nextstate)
+    pred = MDbad(pad_to(states[-1][0][1], 16), 2)
+    print "my prediction is", pred, "with length 354"
+    target = randr(300)
+    glue = randr(36)
+    target2 = target+glue
+    ht = MDbad(target2, 2)
+    targetstates = [state[0] for state in states[0]]
+    while True:
+        x = randr(3)
+        if MDbad(x, 2, ht) in targetstates:
+            idx = targetstates.index(MDbad(x, 2, ht))
+            break
+    target2 += x
+    for i in range(1, k+1):
+        n = idx%2
+        idx /= 2
+        target2 += states[i][idx][n+1][-3:]
+    print "result hash", MDbad(pad_to(target2, 16), 2), "with len", len(target2)
