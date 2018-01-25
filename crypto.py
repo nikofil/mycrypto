@@ -1260,3 +1260,198 @@ def MDbad_nostradamus():
         idx /= 2
         target2 += states[i][idx][n+1][-3:]
     print "result hash", MDbad(pad_to(target2, 16), 2), "with len", len(target2)
+
+# Wang's attack on MD4
+def md4_wang_atk():
+    def _left_rotate(n, b):
+            return ((n << b) | ((n & 0xffffffff) >> (32 - b))) & 0xffffffff
+
+    def _f(x, y, z): return x & y | ~x & z
+
+    A = 0x67452301
+    B = 0xefcdab89
+    C = 0x98badcfe
+    D = 0x10325476
+
+    m2x = lambda msg, idx: struct.unpack('<I', msg[idx*4:idx*4+4])[0]
+
+    _f1 = lambda a, b, c, d, s, X: (_left_rotate(a + _f(b, c, d) + X, s), a + _f(b,c,d))
+
+    def fix(msg, a, off, rrot, idx):
+        x = (_left_rotate(a, 32-rrot) - off) % (1<<32)
+        x = s2a(struct.pack('<I', x))
+        msg[idx*4:idx*4+4] = x
+
+    def ms(msg):
+        x = m2x(a2s(msg), 0)
+        a=A
+        b=B
+        c=C
+        d=D
+
+        sbit = lambda x, y, bit: (x ^ y) & (1 << (bit-1))
+
+        a,off = _f1(a, b, c, d, 3, m2x(a2s(msg), 0))
+        a ^= sbit(a, b, 7)
+        fix(msg, a, off, 3, 0)
+
+        d,off = _f1(d, a, b, c, 7, m2x(a2s(msg), 1))
+        d ^= sbit(d, 0, 7)
+        d ^= sbit(d, a, 8)
+        d ^= sbit(d, a, 11)
+        fix(msg, d, off, 7, 1)
+
+        c,off = _f1(c, d, a, b, 11, m2x(a2s(msg), 2))
+        c ^= sbit(c, ~0, 7)
+        c ^= sbit(c, ~0, 8)
+        c ^= sbit(c, 0, 11)
+        c ^= sbit(c, d, 26)
+        fix(msg, c, off, 11, 2)
+
+        b,off = _f1(b, c, d, a, 19, m2x(a2s(msg), 3))
+        b ^= sbit(b, ~0, 7)
+        b ^= sbit(b, 0, 8)
+        b ^= sbit(b, 0, 11)
+        b ^= sbit(b, 0, 26)
+        fix(msg, b, off, 19, 3)
+
+        a,off = _f1(a, b, c, d, 3, m2x(a2s(msg), 4))
+        a ^= sbit(a, ~0, 8)
+        a ^= sbit(a, ~0, 11)
+        a ^= sbit(a, 0, 26)
+        a ^= sbit(a, b, 14)
+        fix(msg, a, off, 3, 4)
+
+        d,off = _f1(d, a, b, c, 7, m2x(a2s(msg), 5))
+        d ^= sbit(d, 0, 14)
+        d ^= sbit(d, a, 19)
+        d ^= sbit(d, a, 20)
+        d ^= sbit(d, a, 21)
+        d ^= sbit(d, a, 22)
+        d ^= sbit(d, ~0, 26)
+        fix(msg, d, off, 7, 5)
+
+        c,off = _f1(c, d, a, b, 11, m2x(a2s(msg), 6))
+        c ^= sbit(c, d, 13)
+        c ^= sbit(c, 0, 14)
+        c ^= sbit(c, d, 15)
+        c ^= sbit(c, 0, 19)
+        c ^= sbit(c, 0, 20)
+        c ^= sbit(c, ~0, 21)
+        c ^= sbit(c, 0, 22)
+        fix(msg, c, off, 11, 6)
+
+        b,off = _f1(b, c, d, a, 19, m2x(a2s(msg), 7))
+        b ^= sbit(b, ~0, 13)
+        b ^= sbit(b, ~0, 14)
+        b ^= sbit(b, 0, 15)
+        b ^= sbit(b, c, 17)
+        b ^= sbit(b, 0, 19)
+        b ^= sbit(b, 0, 20)
+        b ^= sbit(b, 0, 21)
+        b ^= sbit(b, 0, 22)
+        fix(msg, b, off, 19, 7)
+
+        a,off = _f1(a, b, c, d, 3, m2x(a2s(msg), 8))
+        a ^= sbit(a, ~0, 13)
+        a ^= sbit(a, ~0, 14)
+        a ^= sbit(a, ~0, 15)
+        a ^= sbit(a, 0, 17)
+        a ^= sbit(a, 0, 19)
+        a ^= sbit(a, 0, 20)
+        a ^= sbit(a, 0, 21)
+        a ^= sbit(a, b, 23)
+        a ^= sbit(a, ~0, 22)
+        a ^= sbit(a, b, 26)
+        fix(msg, a, off, 3, 8)
+
+        d,off = _f1(d, a, b, c, 7, m2x(a2s(msg), 9))
+        d ^= sbit(d, ~0, 13)
+        d ^= sbit(d, ~0, 14)
+        d ^= sbit(d, ~0, 15)
+        d ^= sbit(d, 0, 17)
+        d ^= sbit(d, 0, 20)
+        d ^= sbit(d, ~0, 21)
+        d ^= sbit(d, ~0, 22)
+        d ^= sbit(d, 0, 23)
+        d ^= sbit(d, ~0, 26)
+        d ^= sbit(d, a, 30)
+        fix(msg, d, off, 7, 9)
+
+        c,off = _f1(c, d, a, b, 11, m2x(a2s(msg), 10))
+        c ^= sbit(c, ~0, 17)
+        c ^= sbit(c, 0, 20)
+        c ^= sbit(c, 0, 21)
+        c ^= sbit(c, 0, 22)
+        c ^= sbit(c, 0, 23)
+        c ^= sbit(c, 0, 26)
+        c ^= sbit(c, ~0, 30)
+        c ^= sbit(c, d, 32)
+        fix(msg, c, off, 11, 10)
+
+        b,off = _f1(b, c, d, a, 19, m2x(a2s(msg), 11))
+        b ^= sbit(b, 0, 20)
+        b ^= sbit(b, ~0, 21)
+        b ^= sbit(b, ~0, 22)
+        b ^= sbit(b, c, 23)
+        b ^= sbit(b, ~0, 26)
+        b ^= sbit(b, 0, 30)
+        b ^= sbit(b, 0, 32)
+        fix(msg, b, off, 19, 11)
+
+        a,off = _f1(a, b, c, d, 3, m2x(a2s(msg), 12))
+        a ^= sbit(a, 0, 23)
+        a ^= sbit(a, 0, 26)
+        a ^= sbit(a, b, 27)
+        a ^= sbit(a, b, 29)
+        a ^= sbit(a, ~0, 30)
+        a ^= sbit(a, 0, 32)
+        fix(msg, a, off, 3, 12)
+
+        d,off = _f1(d, a, b, c, 7, m2x(a2s(msg), 13))
+        d ^= sbit(d, 0, 23)
+        d ^= sbit(d, 0, 26)
+        d ^= sbit(d, ~0, 27)
+        d ^= sbit(d, ~0, 29)
+        d ^= sbit(d, 0, 30)
+        d ^= sbit(d, ~0, 32)
+        fix(msg, d, off, 7, 13)
+
+        c,off = _f1(c, d, a, b, 11, m2x(a2s(msg), 14))
+        c ^= sbit(c, d, 19)
+        c ^= sbit(c, ~0, 23)
+        c ^= sbit(c, ~0, 26)
+        c ^= sbit(c, 0, 27)
+        c ^= sbit(c, 0, 29)
+        c ^= sbit(c, 0, 30)
+        fix(msg, c, off, 11, 14)
+
+        b,off = _f1(b, c, d, a, 19, m2x(a2s(msg), 15))
+        b ^= sbit(b, 0, 19)
+        b ^= sbit(b, ~0, 26)
+        b ^= sbit(b, ~0, 27)
+        b ^= sbit(b, ~0, 29)
+        b ^= sbit(b, 0, 30)
+        fix(msg, b, off, 19, 15)
+
+        return msg
+
+    msgorig = ms(randr(64))
+    md4target = md4(msgorig)
+    msg = [x for x in msgorig]
+
+    i = 0
+    j = 100
+    while not (md4(msg) == md4target and msg != msgorig):
+        if j == 100:
+            j = 0
+            msgorig = ms(randr(64))
+            md4target = md4(msgorig)
+            msg = [x for x in msgorig]
+        if i == 40:
+            msg = [x for x in msgorig]
+            i = 0
+            j+=1
+        msg[random.randrange(64)] ^= 1 << random.randrange(8)
+        i+=1
+    print md4(msg), md4(msgorig), msg == msgorig
